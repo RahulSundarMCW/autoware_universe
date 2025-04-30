@@ -30,6 +30,7 @@
   <arg name="obstacle_segmentation_ground_segmentation_elevation_map_param_path"/>
   <arg name="object_recognition_detection_obstacle_pointcloud_based_validator_param_path"/>
   <arg name="object_recognition_detection_detection_by_tracker_param"/>
+  <arg name="object_recognition_detection_bevdet_tensorrt_bevdet_param_path"/>
   <arg name="occupancy_grid_map_method"/>
   <arg name="occupancy_grid_map_param_path"/>
   <arg name="occupancy_grid_map_updater"/>
@@ -56,7 +57,7 @@
 
   <!-- Common parameters -->
   <arg name="input/pointcloud" default="/sensing/lidar/concatenated/pointcloud" description="The topic will be used in the detection module"/>
-  <arg name="mode" default="camera_lidar_fusion" description="options: `camera_lidar_radar_fusion`, `camera_lidar_fusion`, `lidar_radar_fusion`, `lidar` or `radar`"/>
+  <arg name="mode" default="camera" description="options: `camera_lidar_radar_fusion`, `camera_lidar_fusion`, `lidar_radar_fusion`, `lidar` or `radar`"/>
   <arg name="data_path" default="$(env HOME)/autoware_data" description="packages data and artifacts directory path"/>
   <arg name="lidar_detection_model_type" default="$(var lidar_detection_model_type)" description="options: `transfusion`, `centerpoint`, `pointpainting`, `apollo`, `clustering`"/>
   <arg name="lidar_detection_model_name" default="$(var lidar_detection_model_name)" description="options: `transfusion`, `centerpoint`, `centerpoint_tiny`, `centerpoint_sigma`, `pointpainting`"/>
@@ -256,6 +257,7 @@
           <arg name="radar_lanelet_filtering_range_param_path" value="$(var object_recognition_detection_radar_lanelet_filtering_range_param_path)"/>
           <arg name="radar_object_clustering_param_path" value="$(var object_recognition_detection_radar_object_clustering_param_path)"/>
           <arg name="detection_by_tracker_param_path" value="$(var object_recognition_detection_detection_by_tracker_param)"/>
+          <arg name="tensorrt_bevdet_param_path" value="$(var object_recognition_detection_bevdet_tensorrt_bevdet_param_path)"/>
 
           <arg name="use_detection_by_tracker" value="$(var use_detection_by_tracker)"/>
           <arg name="use_validator" value="$(var use_object_validator)"/>
