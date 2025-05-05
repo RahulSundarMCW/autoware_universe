@@ -14,11 +14,15 @@
 
 // cspell:ignore BEVDET, thre, TRTBEV, bevdet, caminfo, intrin, Ncams, bevfeat, dlongterm
 
-#include "autoware/tensorrt_bevdet/bevdet_node.hpp"
-
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "autoware/tensorrt_bevdet/bevdet_node.hpp"
+#include "visualization_msgs/msg/marker_array.hpp"
+#include <cv_bridge/cv_bridge.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 namespace autoware
 {
@@ -74,6 +78,9 @@ void TRTBEVDetNode::initModel()
 
   pub_boxes_ = this->create_publisher<autoware_perception_msgs::msg::DetectedObjects>(
     "~/output/boxes", rclcpp::QoS{1});
+  pub_markers_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
+    "~/output_bboxes", rclcpp::QoS{1});
+
 }
 
 void TRTBEVDetNode::checkInitialization()
@@ -116,6 +123,7 @@ void TRTBEVDetNode::startImageSubscription()
   sync_->registerCallback(std::bind(&TRTBEVDetNode::callback, this, _1, _2, _3, _4, _5, _6));
 }
 
+
 void TRTBEVDetNode::startCameraInfoSubscription()
 {
   // cams: ["CAM_FRONT_LEFT", "CAM_FRONT", "CAM_FRONT_RIGHT", "CAM_BACK_LEFT", "CAM_BACK",
@@ -143,6 +151,60 @@ void TRTBEVDetNode::startCameraInfoSubscription()
   sub_br_caminfo_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
     "~/input/topic_img_br/camera_info", rclcpp::QoS{1},
     [this](const sensor_msgs::msg::CameraInfo::SharedPtr msg) { cameraInfoCallback(5, msg); });
+
+}
+
+visualization_msgs::msg::MarkerArray createMarkerArray(
+  const autoware_perception_msgs::msg::DetectedObjects & detected_objects,
+  const rclcpp::Time & stamp)
+{
+  (void)stamp;
+  visualization_msgs::msg::MarkerArray marker_array;
+  int id = 0;
+
+  for (const auto & object : detected_objects.objects) {
+    visualization_msgs::msg::Marker marker;
+
+    marker.header = detected_objects.header;
+    marker.ns = "bevdet_boxes";
+    marker.id = id++;
+    marker.type = visualization_msgs::msg::Marker::CUBE;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    marker.pose = object.kinematics.pose_with_covariance.pose;
+    marker.scale.x = object.shape.dimensions.x;
+    marker.scale.y = object.shape.dimensions.y;
+    marker.scale.z = object.shape.dimensions.z;
+
+    // Make the boxes THICK
+    marker.scale.x += 0.2;
+    marker.scale.y += 0.2;
+    marker.scale.z += 0.2;
+
+    marker.lifetime = rclcpp::Duration::from_seconds(0.1);
+
+    // Color based on label
+    if (object.classification.front().label == autoware_perception_msgs::msg::ObjectClassification::CAR) {
+      marker.color.r = 0.0f;
+      marker.color.g = 1.0f;
+      marker.color.b = 0.0f;
+      marker.color.a = 1.0f;
+    } else if (object.classification.front().label == autoware_perception_msgs::msg::ObjectClassification::PEDESTRIAN) {
+      marker.color.r = 1.0f;
+      marker.color.g = 0.0f;
+      marker.color.b = 0.0f;
+      marker.color.a = 1.0f;
+    } else {
+      marker.color.r = 0.0f;
+      marker.color.g = 0.0f;
+      marker.color.b = 1.0f;
+      marker.color.a = 1.0f;
+    }
+
+    marker_array.markers.push_back(marker);
+  }
+
+  return marker_array;
 }
 
 void TRTBEVDetNode::callback(
@@ -155,12 +217,27 @@ void TRTBEVDetNode::callback(
 {
   cv::Mat img_fl, img_f, img_fr, img_bl, img_b, img_br;
   std::vector<cv::Mat> imgs;
-  img_fl = cv_bridge::toCvShare(msg_fl_img, "bgr8")->image;
-  img_f = cv_bridge::toCvShare(msg_f_img, "bgr8")->image;
-  img_fr = cv_bridge::toCvShare(msg_fr_img, "bgr8")->image;
-  img_bl = cv_bridge::toCvShare(msg_bl_img, "bgr8")->image;
-  img_b = cv_bridge::toCvShare(msg_b_img, "bgr8")->image;
-  img_br = cv_bridge::toCvShare(msg_br_img, "bgr8")->image;
+
+  try {
+    // Use toCvCopy without specifying encoding to use the source encoding
+    img_fl = cv_bridge::toCvCopy(msg_fl_img)->image;
+    img_f = cv_bridge::toCvCopy(msg_f_img)->image;
+    img_fr = cv_bridge::toCvCopy(msg_fr_img)->image;
+    img_bl = cv_bridge::toCvCopy(msg_bl_img)->image;
+    img_b = cv_bridge::toCvCopy(msg_b_img)->image;
+    img_br = cv_bridge::toCvCopy(msg_br_img)->image;
+
+    // Ensure all images are in BGR format if needed
+    if (img_fl.channels() == 1) cv::cvtColor(img_fl, img_fl, cv::COLOR_GRAY2BGR);
+    if (img_f.channels() == 1) cv::cvtColor(img_f, img_f, cv::COLOR_GRAY2BGR);
+    if (img_fr.channels() == 1) cv::cvtColor(img_fr, img_fr, cv::COLOR_GRAY2BGR);
+    if (img_bl.channels() == 1) cv::cvtColor(img_bl, img_bl, cv::COLOR_GRAY2BGR);
+    if (img_b.channels() == 1) cv::cvtColor(img_b, img_b, cv::COLOR_GRAY2BGR);
+    if (img_br.channels() == 1) cv::cvtColor(img_br, img_br, cv::COLOR_GRAY2BGR);
+  } catch (cv_bridge::Exception & e) {
+    RCLCPP_ERROR(this->get_logger(), "CV bridge exception: %s", e.what());
+    return;
+  }
 
   imgs.emplace_back(img_fl);
   imgs.emplace_back(img_f);
@@ -186,7 +263,48 @@ void TRTBEVDetNode::callback(
 
   box3DToDetectedObjects(ego_boxes, bevdet_objects, class_names_, score_thre_, has_twist_);
 
+  // Apply coordinate transformation to match NuScenes
+  for (auto & obj : bevdet_objects.objects) {
+    // Get current position
+    auto & pos = obj.kinematics.pose_with_covariance.pose.position;
+
+    // Save original position
+    float orig_x = pos.x;
+    float orig_y = pos.y;
+    float orig_z = pos.z;
+
+    // Apply NuScenes-compatible coordinate transformation
+    pos.x = orig_x;
+    pos.y = orig_y;  // Invert Y to match NuScenes convention
+    pos.z = orig_z;
+
+    // Apply orientation correction
+    tf2::Quaternion q(
+      obj.kinematics.pose_with_covariance.pose.orientation.x,
+      obj.kinematics.pose_with_covariance.pose.orientation.y,
+      obj.kinematics.pose_with_covariance.pose.orientation.z,
+      obj.kinematics.pose_with_covariance.pose.orientation.w
+    );
+
+    // Apply PI rotation around Z-axis (180 degrees)
+    tf2::Quaternion correction;
+    correction.setRPY(0, 0, M_PI);
+    q = correction * q;
+    q.normalize();
+
+    // Update orientation
+    obj.kinematics.pose_with_covariance.pose.orientation.x = q.x();
+    obj.kinematics.pose_with_covariance.pose.orientation.y = q.y();
+    obj.kinematics.pose_with_covariance.pose.orientation.z = q.z();
+    obj.kinematics.pose_with_covariance.pose.orientation.w = q.w();
+  }
+
+  auto marker_array = createMarkerArray(bevdet_objects, msg_f_img->header.stamp);
+
   pub_boxes_->publish(bevdet_objects);
+  
+  pub_markers_->publish(marker_array);
+
 }
 
 void TRTBEVDetNode::cameraInfoCallback(int idx, const sensor_msgs::msg::CameraInfo::SharedPtr msg)
