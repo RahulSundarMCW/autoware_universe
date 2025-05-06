@@ -24,6 +24,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
+rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_markers_;
+
 namespace autoware
 {
 namespace tensorrt_bevdet
