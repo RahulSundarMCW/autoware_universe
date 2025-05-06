@@ -154,7 +154,7 @@ void TRTBEVDetNode::startCameraInfoSubscription()
 
 }
 
-visualization_msgs::msg::MarkerArray createMarkerArray(
+visualization_msgs::msg::MarkerArray TRTBEVDetNode::createMarkerArray(
   const autoware_perception_msgs::msg::DetectedObjects & detected_objects,
   const rclcpp::Time & stamp)
 {
