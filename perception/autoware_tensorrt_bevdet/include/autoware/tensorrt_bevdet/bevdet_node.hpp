@@ -42,6 +42,9 @@
 #include <thread>
 #include <vector>
 
+#include "visualization_msgs/msg/marker_array.hpp"
+#include "autoware_perception_msgs/msg/detected_objects.hpp"
+
 namespace autoware
 {
 namespace tensorrt_bevdet
@@ -73,6 +76,7 @@ private:
   float score_thre_;            ///< Score threshold for object detection
   bool has_twist_ = true;       /// wether set twist for objects
 
+  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_markers_;  ///< Publisher for publishing markers for visualization
   rclcpp::Publisher<autoware_perception_msgs::msg::DetectedObjects>::SharedPtr
     pub_boxes_;  ///< Publisher for publishing the detected objects
 
@@ -159,6 +163,16 @@ public:
    * @param options The options for the node.
    */
   explicit TRTBEVDetNode(const rclcpp::NodeOptions & options);
+
+  /**
+   * @brief Creates marker array for visualization
+   * @param detected_objects The detected objects to visualize
+   * @param stamp The timestamp for the markers
+   * @return The marker array for visualization
+   */
+  static visualization_msgs::msg::MarkerArray createMarkerArray(
+    const autoware_perception_msgs::msg::DetectedObjects & detected_objects,
+    const rclcpp::Time & stamp);
 
   /**
    * @brief Destructor for TRTBEVDetNode.
