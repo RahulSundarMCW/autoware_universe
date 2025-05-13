@@ -64,6 +64,9 @@ private:
   std::string model_config_;  ///< Path to the model configuration file
 
   std::string onnx_file_;    ///< Path to the ONNX file
+
+  std::string precision_; // Store precision setting
+  
   std::string engine_file_;  ///< Path to the TensorRT engine file
 
   std::vector<std::string> imgs_name_;    ///< Names of the images
