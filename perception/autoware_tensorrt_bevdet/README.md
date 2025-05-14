@@ -1,77 +1,60 @@
-# tensorrt_bevdet <!-- cspell: ignore bevdet -->
+## Prerequestics
 
-## Purpose
-
-The core algorithm, named `BEVDet`, it unifies multi-view images into the perspective of BEV for 3D object detection task.
-
-## Inner-workings / Algorithms
-
-### Cite
-
-<!-- cspell: ignore Junjie Huang, Guan Huang -->
-
-- Junjie Huang, Guan Huang, "BEVPoolv2: A Cutting-edge Implementation of BEVDet Toward Deployment", [[ref](https://arxiv.org/pdf/2211.17111)]
-- [bevdet_vendor](https://github.com/autowarefoundation/bevdet_vendor) package are copied from the [original codes](https://github.com/LCH1238/bevdet-tensorrt-cpp/tree/one) (The TensorRT, C++ implementation by LCH1238) and modified.
-- This package is ported version toward Autoware from [bevdet_vendor](https://github.com/autowarefoundation/bevdet_vendor).
-
-## Inputs / Outputs
-
-### Inputs
-
-| Name                               | Type                           | Description                         |
-| ---------------------------------- | ------------------------------ | ----------------------------------- |
-| `~/input/topic_img_fl`             | `sensor_msgs::msg::Image`      | input front_left camera image       |
-| `~/input/topic_img_f`              | `sensor_msgs::msg::Image`      | input front camera image            |
-| `~/input/topic_img_fr`             | `sensor_msgs::msg::Image`      | input front_right camera image      |
-| `~/input/topic_img_bl`             | `sensor_msgs::msg::Image`      | input back_left camera image        |
-| `~/input/topic_img_b`              | `sensor_msgs::msg::Image`      | input back camera image             |
-| `~/input/topic_img_br`             | `sensor_msgs::msg::Image`      | input back_right camera image       |
-| `~/input/topic_img_fl/camera_info` | `sensor_msgs::msg::CameraInfo` | input front_left camera parameters  |
-| `~/input/topic_img_f/camera_info`  | `sensor_msgs::msg::CameraInfo` | input front camera parameters       |
-| `~/input/topic_img_fr/camera_info` | `sensor_msgs::msg::CameraInfo` | input front_right camera parameters |
-| `~/input/topic_img_bl/camera_info` | `sensor_msgs::msg::CameraInfo` | input back_left camera parameters   |
-| `~/input/topic_img_b/camera_info`  | `sensor_msgs::msg::CameraInfo` | input back camera parameters        |
-| `~/input/topic_img_br/camera_info` | `sensor_msgs::msg::CameraInfo` | input back_right camera parameters  |
-
-### Outputs
-
-| Name             | Type                                             | Description      |
-| ---------------- | ------------------------------------------------ | ---------------- |
-| `~/output/boxes` | `autoware_perception_msgs::msg::DetectedObjects` | detected objects |
-
-## How to Use Tensorrt BEVDet Node
-
-1. launch `tensorrt_bevdet_node`
-
-   ```bash
-
-   ros2 launch autoware_tensorrt_bevdet tensorrt_bevdet_node.launch.xml
-   ```
-
-2. play ros2 bag of nuScenes data
-
-   Please refer to open source repository [ros2_dataset_bridge](https://github.com/Owen-Liuyuxuan/ros2_dataset_bridge) to publish the ROS 2 topics for NuScenes dataset.
+- Tensorrt 10.8.0.43
+- CUDA 12.4
+- cuDNN 8.9.2
 
 ## Trained Models
 
-You can download the onnx format of trained models by clicking on the links below.
-
-- BEVDet: [bevdet_one_lt_d.onnx](https://drive.google.com/file/d/1eMGJfdCVlDPBphBTjMcnIh3wdW7Q7WZB/view?usp=sharing)
+Download the [bevdet_one_lt_d.onnx](https://drive.google.com/file/d/1eMGJfdCVlDPBphBTjMcnIh3wdW7Q7WZB/view?usp=sharing) of trained models in the below path:
+   
+   ```bash
+   $HOME/autoware_data/tensorrt_bevdet
+   ```
 
 The `BEVDet` model was trained in `NuScenes` dataset for 20 epochs.
 
-## Limitation
+## Test Tensorrt BEVDet Node with Nuscenes
 
-The model is trained on open-source dataset `NuScenes` and has poor generalization on its own dataset, If you want to use this model to infer your data, you need to retrain it.
+1. Integerate this branch changes in your **autoware_universe/perception** directory
 
-## Training BEVDet Model
+2. Include this [bevdet_vendor pr](https://github.com/autowarefoundation/bevdet_vendor/pull/1) in **src/universe/external/bevdet_vendor** as this supports fp16 precision and api support for Tensorrt 10.x.x
 
-If you want to train model using the [TIER IV's internal database(~2600 key frames)](https://drive.google.com/file/d/1UaarK88HZu09sf7Ix-bEVl9zGNGFwTVL/view?usp=sharing), please refer to the following repositories:[BEVDet adapted to TIER IV dataset](https://github.com/cyn-liu/BEVDet/tree/train_export).
+3. To play ros2 bag of nuScenes data
+   
+   ```bash
 
-## References/External links
+   cd autoware/src
+   git clone https://github.com/Owen-Liuyuxuan/ros2_dataset_bridge
+   cd ..
+   
+   nano src/ros2_dataset_bridge/launch/nuscenes_launch.xml
 
-[1] <https://github.com/HuangJunJie2017/BEVDet/tree/dev2.1>
+   # Modify the below default to point nuscenes dataset!! Also control the publishing frequency of the data stream.
 
-[2] <https://github.com/LCH1238/BEVDet/tree/export>
+   <arg name="NUSCENES_DIR" default="<nuscenes_dataset_path>"/>
+   <arg name="NUSCENES_VER" default="v1.0-trainval"/> 
+   
+   # Build the autoware
 
-[3] <https://github.com/LCH1238/bevdet-tensorrt-cpp/tree/one>
+   colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+   
+   source install/setup.bash # install/setup.zsh or install/setup.sh for your own need.
+   source /opt/ros/humble/setup.bash
+   
+   # this will launch the data publisher / rviz / GUI controller
+   ros2 launch ros2_dataset_bridge nuscenes_launch.xml
+
+   # if no nuscenes boxes visible in rivz, make sure GUI controller "Stop" checkbox is unchecked and click the "OK" tab.
+   ```
+
+4. Launch `tensorrt_bevdet_node`
+
+   ```bash
+   
+   ros2 launch autoware_tensorrt_bevdet tensorrt_bevdet.launch.xml
+
+   # By default precision mode is fp16, to launch with precision mode fp32
+
+   ros2 launch autoware_tensorrt_bevdet tensorrt_bevdet.launch.xml precision:=fp32
+   ```
