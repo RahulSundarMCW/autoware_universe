@@ -23,29 +23,37 @@ The `BEVDet` model was trained in `NuScenes` dataset for 20 epochs.
 3. To play ros2 bag of nuScenes data
    
    ```bash
-
+   
    cd autoware/src
    git clone https://github.com/Owen-Liuyuxuan/ros2_dataset_bridge
    cd ..
    
+   #Open the launch file to configure dataset settings:
+   
    nano src/ros2_dataset_bridge/launch/nuscenes_launch.xml
-
-   # Modify the below default to point nuscenes dataset!! Also control the publishing frequency of the data stream.
-
+   
+   # Update the following lines with the correct NuScenes dataset path and set the publishing frequency to 10 Hz for optimal data streaming:
+   
    <arg name="NUSCENES_DIR" default="<nuscenes_dataset_path>"/>
    <arg name="NUSCENES_VER" default="v1.0-trainval"/> 
+   <arg name="UPDATE_FREQUENCY" default="10.0"/>
    
-   # Build the autoware
-
+   # Build Autoware
+   
    colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+   
+   # Source the environment
    
    source install/setup.bash # install/setup.zsh or install/setup.sh for your own need.
    source /opt/ros/humble/setup.bash
    
-   # this will launch the data publisher / rviz / GUI controller
+   # Launch the data publisher, RViz, and GUI controller:
+   
    ros2 launch ros2_dataset_bridge nuscenes_launch.xml
-
-   # if no nuscenes boxes visible in rivz, make sure GUI controller "Stop" checkbox is unchecked and click the "OK" tab.
+   
+   # Tip: If NuScenes boxes are not visible in RViz, ensure the "Stop" checkbox in the GUI controller is unchecked, then click "OK".
+   
+   # Note: ROS bag playback is limited to 10 Hz, which constrains the BEVDet node to the same rate. However, based on callback execution time, BEVDet can run at up to 35 FPS with FP16 and 17 FPS with FP32.
    ```
 
 4. Launch `tensorrt_bevdet_node`
