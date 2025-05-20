@@ -169,6 +169,33 @@ visualization_msgs::msg::MarkerArray TRTBEVDetNode::createMarkerArray(
   visualization_msgs::msg::MarkerArray marker_array;
   int id = 0;
 
+  // Define NuScenes-like color mapping
+  std::map<uint8_t, std::array<float, 4>> class_colors;
+  // Car (orange) - R:255, G:158, B:0
+  class_colors[autoware_perception_msgs::msg::ObjectClassification::CAR] = {1.0f, 0.62f, 0.0f, 1.0f};
+  // Pedestrian (blue) - R:0, G:0, B:230
+  class_colors[autoware_perception_msgs::msg::ObjectClassification::PEDESTRIAN] = {0.0f, 0.0f, 0.9f, 1.0f};
+  // Bicycle (pink) - R:255, G:61, B:99
+  class_colors[autoware_perception_msgs::msg::ObjectClassification::BICYCLE] = {1.0f, 0.24f, 0.39f, 1.0f};
+  // Motorcycle (pink) - R:255, G:61, B:99
+  class_colors[autoware_perception_msgs::msg::ObjectClassification::MOTORCYCLE] = {1.0f, 0.24f, 0.39f, 1.0f};
+  // Bus (orange) - R:255, G:158, B:0
+  class_colors[autoware_perception_msgs::msg::ObjectClassification::BUS] = {1.0f, 0.62f, 0.0f, 1.0f};
+  // Truck (orange) - R:255, G:158, B:0
+  class_colors[autoware_perception_msgs::msg::ObjectClassification::TRUCK] = {1.0f, 0.62f, 0.0f, 1.0f};
+  // Default (purple) - R:255, G:0, B:255
+  std::array<float, 4> default_color = {1.0f, 0.0f, 1.0f, 1.0f};
+
+  // First, add a deletion marker to clear all previous markers
+  visualization_msgs::msg::Marker deletion_marker;
+  deletion_marker.header = detected_objects.header;
+
+  deletion_marker.header.frame_id = "baselink";
+  deletion_marker.ns = "bevdet_boxes";
+  deletion_marker.id = 0;
+  deletion_marker.action = visualization_msgs::msg::Marker::DELETEALL;
+  marker_array.markers.push_back(deletion_marker);
+
   for (const auto & object : detected_objects.objects) {
     visualization_msgs::msg::Marker marker;
 
@@ -183,30 +210,25 @@ visualization_msgs::msg::MarkerArray TRTBEVDetNode::createMarkerArray(
     marker.scale.y = object.shape.dimensions.y;
     marker.scale.z = object.shape.dimensions.z;
 
-    // Make the boxes THICK
+    // Make the boxes THICK (optional - keep if you want thicker boxes)
     marker.scale.x += 0.2;
     marker.scale.y += 0.2;
     marker.scale.z += 0.2;
 
-    marker.lifetime = rclcpp::Duration::from_seconds(0.1);
+    marker.lifetime = rclcpp::Duration::from_seconds(0.3);
 
-    // Color based on label
-    if (object.classification.front().label == autoware_perception_msgs::msg::ObjectClassification::CAR) {
-      marker.color.r = 0.0f;
-      marker.color.g = 1.0f;
-      marker.color.b = 0.0f;
-      marker.color.a = 1.0f;
-    } else if (object.classification.front().label == autoware_perception_msgs::msg::ObjectClassification::PEDESTRIAN) {
-      marker.color.r = 1.0f;
-      marker.color.g = 0.0f;
-      marker.color.b = 0.0f;
-      marker.color.a = 1.0f;
-    } else {
-      marker.color.r = 0.0f;
-      marker.color.g = 0.0f;
-      marker.color.b = 1.0f;
-      marker.color.a = 1.0f;
+    // Set color based on NuScenes color scheme
+    uint8_t label = object.classification.front().label;
+    std::array<float, 4> color = default_color;
+    
+    if (class_colors.find(label) != class_colors.end()) {
+      color = class_colors[label];
     }
+    
+    marker.color.r = color[0];
+    marker.color.g = color[1];
+    marker.color.b = color[2];
+    marker.color.a = color[3];
 
     marker_array.markers.push_back(marker);
   }
@@ -272,19 +294,6 @@ void TRTBEVDetNode::callback(
 
   // Apply coordinate transformation to match NuScenes
   for (auto & obj : bevdet_objects.objects) {
-    // Get current position
-    auto & pos = obj.kinematics.pose_with_covariance.pose.position;
-
-    // Save original position
-    float orig_x = pos.x;
-    float orig_y = pos.y;
-    float orig_z = pos.z;
-
-    // Apply NuScenes-compatible coordinate transformation
-    pos.x = orig_x;
-    pos.y = orig_y;  // Invert Y to match NuScenes convention
-    pos.z = orig_z;
-
     // Apply orientation correction
     tf2::Quaternion q(
       obj.kinematics.pose_with_covariance.pose.orientation.x,
