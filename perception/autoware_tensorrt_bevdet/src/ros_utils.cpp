@@ -25,6 +25,9 @@
 #include <string>
 #include <vector>
 
+#include <fstream>  // Add at the top if not included
+#include <nlohmann/json.hpp>  // For JSON dump (if you're using nlohmann::json)
+
 namespace autoware::tensorrt_bevdet
 {
 using Label = autoware_perception_msgs::msg::ObjectClassification;
@@ -52,9 +55,32 @@ uint8_t getSemanticType(const std::string & class_name)
 
 void box3DToDetectedObjects(
   const std::vector<Box> & boxes, autoware_perception_msgs::msg::DetectedObjects & bevdet_objects,
-  const std::vector<std::string> & class_names, float score_thre, const bool has_twist = true)
+  const std::vector<std::string> & class_names, const float & score_thre, const bool has_twist = true)
 {
-  for (auto b : boxes) {
+
+  nlohmann::json box_dump_json = nlohmann::json::array();
+
+  for (const auto & b : boxes) {
+    nlohmann::json box_json;
+    box_json["x"] = b.x;
+    box_json["y"] = b.y;
+    box_json["z"] = b.z;
+    box_json["l"] = b.l;
+    box_json["w"] = b.w;
+    box_json["h"] = b.h;
+    box_json["r"] = b.r;
+    box_json["vx"] = b.vx;
+    box_json["vy"] = b.vy;
+    box_json["score"] = b.score;
+    box_json["label"] = b.label;
+    box_dump_json.push_back(box_json);
+  }
+
+  std::ofstream out_file("/home/rahul/Autoware/autoware_forks/autoware_build_test/boxes_dump.txt", std::ios_base::app);
+  out_file << box_dump_json.dump(2) << "\n\n\n\n\n";  // Pretty-print with indentation
+  out_file.close();
+
+  for (const auto & b : boxes) {
     if (b.score < score_thre) continue;
     autoware_perception_msgs::msg::DetectedObject obj;
 
